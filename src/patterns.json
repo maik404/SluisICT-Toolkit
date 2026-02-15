@@ -1,0 +1,340 @@
+{
+  "version": "3.5",
+  "description": "SluisICT AI Pattern Definitions - NL market",
+  "benchmarks": {
+    "description": "NL markt referentiewaardes",
+    "download_excellent": 200,
+    "download_good": 100,
+    "download_minimum": 25,
+    "upload_excellent": 100,
+    "upload_good": 40,
+    "upload_minimum": 10,
+    "latency_excellent": 10,
+    "latency_good": 30,
+    "latency_poor": 100,
+    "jitter_excellent": 5,
+    "jitter_good": 15,
+    "jitter_poor": 30,
+    "dns_excellent": 20,
+    "dns_good": 50,
+    "dns_poor": 100,
+    "wifi_signal_good": 75,
+    "wifi_signal_fair": 50,
+    "wifi_signal_poor": 30,
+    "packet_loss_acceptable": 1,
+    "packet_loss_warning": 5
+  },
+  "patterns": [
+    {
+      "id": "dubbele_nat_adapter_aware",
+      "title": "Dubbele NAT (adapter-aware detectie)",
+      "description": "Multiple private IP hops in traceroute, filtering virtual adapter subnets",
+      "detection": {
+        "files": ["08_tracert_8.8.8.8.txt", "17_security_adapters.txt"],
+        "triggers": [
+          {
+            "type": "regex",
+            "file": "08_tracert_8.8.8.8.txt",
+            "pattern": "(?:10\\.|192\\.168\\.|172\\.(?:1[6-9]|2[0-9]|3[01])\\.)"
+          },
+          { "type": "count_private_hops", "min": 2, "exclude_virtual": true }
+        ]
+      },
+      "scoring": {
+        "base": 60,
+        "modifiers": [
+          { "condition": "different_subnets", "add": 25 },
+          { "condition": "multiple_gateways", "add": 15 }
+        ]
+      },
+      "actions": [
+        "Controleer of ISP modem EN eigen router beide als router staan",
+        "ISP modem in bridge mode zetten, OF eigen router in access point mode",
+        "Na wijziging: herstart alle apparaten en test opnieuw"
+      ],
+      "difficulty": "middel"
+    },
+    {
+      "id": "dubbele_dhcp",
+      "title": "Dubbele DHCP servers",
+      "description": "Twee of meer DHCP servers actief op hetzelfde netwerk segment",
+      "detection": {
+        "files": ["01_ipconfig_all.txt"],
+        "triggers": [
+          { "type": "regex", "file": "01_ipconfig_all.txt", "pattern": "DHCP Server[\\s.:]+\\d+\\.\\d+\\.\\d+\\.\\d+" },
+          { "type": "count_unique_dhcp", "min": 2 }
+        ]
+      },
+      "scoring": {
+        "base": 70,
+        "modifiers": [
+          { "condition": "dhcp_different_subnet", "add": 20 },
+          { "condition": "ip_conflicts_detected", "add": 30 }
+        ]
+      },
+      "actions": [
+        "Controleer of ISP modem EN eigen router beide DHCP hebben aanstaan",
+        "Schakel DHCP uit op 1 van de 2 apparaten (meestal de eigen router als die in AP-mode gaat)",
+        "Herstart alle apparaten na wijziging zodat ze een nieuw IP krijgen"
+      ],
+      "difficulty": "laag"
+    },
+    {
+      "id": "zwak_wifi_signaal",
+      "title": "Zwak WiFi signaal",
+      "description": "WiFi signaalsterkte onder 50%, leidt tot trage en instabiele verbinding",
+      "detection": {
+        "files": ["09_wifi_netsh_interfaces.txt"],
+        "triggers": [
+          { "type": "regex", "file": "09_wifi_netsh_interfaces.txt", "pattern": "Signal\\s*:\\s*(\\d+)%" },
+          { "type": "threshold_below", "field": "signal_percent", "value": 50 }
+        ]
+      },
+      "scoring": {
+        "base": 50,
+        "modifiers": [
+          { "condition": "signal_below_30", "add": 30 },
+          { "condition": "high_packet_loss", "add": 20 }
+        ]
+      },
+      "actions": [
+        "Ga dichter bij de router staan of verplaats de router naar centraler punt",
+        "Test met netwerkkabel om WiFi als oorzaak te bevestigen",
+        "Overweeg mesh systeem of extra access point voor betere dekking"
+      ],
+      "difficulty": "middel"
+    },
+    {
+      "id": "wifi_2_4ghz",
+      "title": "WiFi op 2.4 GHz band",
+      "description": "Apparaat verbonden op tragere 2.4GHz band terwijl 5GHz waarschijnlijk beschikbaar is",
+      "detection": {
+        "files": ["09_wifi_netsh_interfaces.txt"],
+        "triggers": [
+          { "type": "regex", "file": "09_wifi_netsh_interfaces.txt", "pattern": "Channel\\s*:\\s*(\\d+)" },
+          { "type": "channel_range", "min": 1, "max": 14 }
+        ]
+      },
+      "scoring": {
+        "base": 30,
+        "modifiers": [
+          { "condition": "speed_below_50mbps", "add": 20 },
+          { "condition": "5ghz_available_in_env", "add": 10 }
+        ]
+      },
+      "actions": [
+        "Controleer of router 5GHz band ondersteunt",
+        "Maak apart 5GHz netwerk aan of activeer band steering op router",
+        "Vergeet 2.4GHz netwerk op apparaat als 5GHz in bereik is"
+      ],
+      "difficulty": "laag"
+    },
+    {
+      "id": "packet_loss",
+      "title": "Pakketverlies",
+      "description": "Meer dan 2% pakketverlies richting gateway of internet",
+      "detection": {
+        "files": ["06_ping_gateway.txt", "07_ping_8.8.8.8.txt"],
+        "triggers": [
+          { "type": "regex", "file": "06_ping_gateway.txt", "pattern": "Lost\\s*=\\s*\\d+\\s*\\((\\d+)%\\s*loss\\)" },
+          { "type": "regex", "file": "07_ping_8.8.8.8.txt", "pattern": "Lost\\s*=\\s*\\d+\\s*\\((\\d+)%\\s*loss\\)" },
+          { "type": "threshold_above", "field": "loss_percent", "value": 2 }
+        ]
+      },
+      "scoring": {
+        "base": 40,
+        "modifiers": [
+          { "condition": "gateway_loss_above_5", "add": 30 },
+          { "condition": "internet_loss_above_10", "add": 20 },
+          { "condition": "wifi_connected", "add": 10 }
+        ]
+      },
+      "actions": [
+        "Test met netwerkkabel (WiFi bypass) om bron te lokaliseren",
+        "Herstart router en modem (volledig uit, 30 sec wachten)",
+        "Bij aanhoudend verlies over kabel: neem contact op met provider"
+      ],
+      "difficulty": "laag"
+    },
+    {
+      "id": "hoge_latency",
+      "title": "Hoge internet latency",
+      "description": "Gemiddelde latency naar 8.8.8.8 boven 100ms",
+      "detection": {
+        "files": ["07_ping_8.8.8.8.txt"],
+        "triggers": [
+          { "type": "regex", "file": "07_ping_8.8.8.8.txt", "pattern": "Average\\s*=\\s*(\\d+)ms" },
+          { "type": "threshold_above", "field": "average_latency", "value": 100 }
+        ]
+      },
+      "scoring": {
+        "base": 35,
+        "modifiers": [
+          { "condition": "latency_above_200", "add": 25 },
+          { "condition": "gateway_latency_ok", "add": 10 }
+        ]
+      },
+      "actions": [
+        "Herstart modem en router",
+        "Test op ander tijdstip (buiten avondpiek 19:00-23:00)",
+        "Neem contact op met provider als latency continu boven 100ms blijft"
+      ],
+      "difficulty": "laag"
+    },
+    {
+      "id": "trage_internetsnelheid",
+      "title": "Trage internetsnelheid",
+      "description": "Download onder 25 Mbps of significant onder abonnementsnorm (NL markt)",
+      "detection": {
+        "files": ["12_speedtest_readable.txt", "11_speedtest_cli.json"],
+        "triggers": [
+          { "type": "regex", "file": "12_speedtest_readable.txt", "pattern": "Download:\\s+([\\d.]+)\\s*Mbps" },
+          { "type": "threshold_below", "field": "download_mbps", "value": 25 }
+        ]
+      },
+      "scoring": {
+        "base": 50,
+        "modifiers": [
+          { "condition": "download_below_10", "add": 30 },
+          { "condition": "wifi_connected_2_4ghz", "add": 20 },
+          { "condition": "gateway_loss_detected", "add": 15 }
+        ]
+      },
+      "actions": [
+        "Check internetabonnement: welke snelheid hoort erbij?",
+        "Test bekabeld (WiFi omzeilen) om WiFi als bottleneck uit te sluiten",
+        "Test op ander tijdstip en vergelijk resultaten"
+      ],
+      "difficulty": "laag"
+    },
+    {
+      "id": "hoge_jitter",
+      "title": "Hoge jitter (verbindingsinstabiliteit)",
+      "description": "Jitter boven 30ms, slecht voor VoIP, gaming en videobellen",
+      "detection": {
+        "files": ["18_jitter_analysis.txt", "07_ping_8.8.8.8.txt"],
+        "triggers": [
+          { "type": "regex", "file": "18_jitter_analysis.txt", "pattern": "Gemiddeld:\\s*([\\d.]+)ms" },
+          { "type": "threshold_above", "field": "jitter_ms", "value": 30 }
+        ]
+      },
+      "scoring": {
+        "base": 40,
+        "modifiers": [
+          { "condition": "jitter_above_50", "add": 25 },
+          { "condition": "gateway_jitter_high", "add": 30 },
+          { "condition": "packet_loss_present", "add": 15 }
+        ]
+      },
+      "actions": [
+        "Test bekabeld: hoge jitter is vaak WiFi-gerelateerd",
+        "Verminder WiFi interferentie: verplaats router, kies ander kanaal",
+        "Als jitter over kabel ook hoog is: herstart modem + neem contact op met provider"
+      ],
+      "difficulty": "laag"
+    },
+    {
+      "id": "trage_dns",
+      "title": "Trage DNS-respons",
+      "description": "DNS lookups duren langer dan 100ms (Full mode test)",
+      "detection": {
+        "files": ["13_dns_performance.txt"],
+        "triggers": [
+          { "type": "regex", "file": "13_dns_performance.txt", "pattern": "(\\d+)ms" },
+          { "type": "threshold_above", "field": "configured_dns_avg_ms", "value": 100 }
+        ]
+      },
+      "scoring": {
+        "base": 35,
+        "modifiers": [
+          { "condition": "dns_above_200", "add": 25 },
+          { "condition": "public_dns_much_faster", "add": 20 }
+        ]
+      },
+      "actions": [
+        "Wijzig DNS naar 1.1.1.1 (Cloudflare) of 8.8.8.8 (Google)",
+        "In Windows: Netwerk adapter -> IPv4 -> DNS handmatig instellen",
+        "Na wijziging: flush DNS cache met 'ipconfig /flushdns'"
+      ],
+      "difficulty": "laag"
+    },
+    {
+      "id": "mtu_probleem",
+      "title": "MTU probleem (verlaagd)",
+      "description": "MTU onder 1400, duidt op extra encapsulatie (VPN, PPPoE, dubbele tunnel)",
+      "detection": {
+        "files": ["14_mtu_test.txt"],
+        "triggers": [
+          { "type": "regex", "file": "14_mtu_test.txt", "pattern": "Optimale MTU:\\s*(\\d+)" },
+          { "type": "threshold_below", "field": "optimal_mtu", "value": 1400 }
+        ]
+      },
+      "scoring": {
+        "base": 30,
+        "modifiers": [
+          { "condition": "mtu_below_1300", "add": 30 },
+          { "condition": "vpn_detected", "add": 10 },
+          { "condition": "double_nat_detected", "add": 20 }
+        ]
+      },
+      "actions": [
+        "Check of er een VPN actief is (VPN verlaagt MTU)",
+        "Check of glasvezel/PPPoE correct is geconfigureerd op modem",
+        "Check op dubbele router configuratie (dubbele NAT verlaagt MTU)"
+      ],
+      "difficulty": "middel"
+    },
+    {
+      "id": "wifi_congestie",
+      "title": "WiFi kanaalcongestie",
+      "description": "Veel buurnetwerken op hetzelfde kanaal, vertaagt WiFi snelheid",
+      "detection": {
+        "files": ["15_wifi_environment.txt", "09_wifi_netsh_interfaces.txt"],
+        "triggers": [
+          { "type": "count_same_channel", "min": 3 },
+          { "type": "regex", "file": "15_wifi_environment.txt", "pattern": "Kanaal:\\s*(\\d+)" }
+        ]
+      },
+      "scoring": {
+        "base": 30,
+        "modifiers": [
+          { "condition": "same_channel_5_plus", "add": 20 },
+          { "condition": "quieter_channel_available", "add": 15 },
+          { "condition": "on_2_4ghz", "add": 10 }
+        ]
+      },
+      "actions": [
+        "Log in op router (vaak 192.168.1.1 of 192.168.0.1)",
+        "Ga naar WiFi instellingen en kies een rustiger kanaal (1, 6 of 11)",
+        "Overweeg 5GHz band: minder congestie door meer beschikbare kanalen"
+      ],
+      "difficulty": "laag"
+    },
+    {
+      "id": "service_blokkering",
+      "title": "Service blokkering",
+      "description": "Meerdere online services onbereikbaar, duidt op firewall of DNS filtering",
+      "detection": {
+        "files": ["16_service_reachability.txt"],
+        "triggers": [
+          { "type": "count_failed_services", "min": 3 },
+          { "type": "regex", "file": "16_service_reachability.txt", "pattern": "\\u274C" }
+        ]
+      },
+      "scoring": {
+        "base": 40,
+        "modifiers": [
+          { "condition": "all_services_blocked", "add": 40 },
+          { "condition": "dns_works", "add": 10 },
+          { "condition": "ping_works", "add": 10 }
+        ]
+      },
+      "actions": [
+        "Check of Windows Firewall of antivirussoftware services blokkeert",
+        "Test met alternatieve DNS (1.1.1.1) om DNS filtering uit te sluiten",
+        "Probeer in incognito/privemodus om browser-extensies uit te sluiten"
+      ],
+      "difficulty": "laag"
+    }
+  ]
+}
