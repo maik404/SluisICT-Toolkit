@@ -24,3 +24,24 @@ Desktop.ini
 *.tmp
 *.bak
 ~$*
+
+# ============================================
+# Third-party tools (download separately)
+# See Tools/README.md for download links
+# ============================================
+Tools/Netwerk/AdvancedIPScanner/
+Tools/Netwerk/AngryIPScanner/
+Tools/Netwerk/SpeedtestCLI/
+Tools/Netwerk/WifiAnalyzer/
+Tools/Netwerk/WinMTR/
+Tools/Portable/7zip/
+Tools/Portable/NirSoft/
+Tools/Portable/NotepadPP/
+Tools/Portable/PatchMyPC/
+Tools/Portable/SpeedtestCLI/
+Tools/recovery/
+Tools/security/
+Tools/system/
+
+# Keep Tools/README.md in repo
+!Tools/README.md
