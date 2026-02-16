@@ -1,6 +1,9 @@
 @echo off
 title SluisICT Netwerk Diagnose v3.5
 color 0F
+
+:MENU
+cls
 echo.
 echo ===========================================
 echo  SluisICT Netwerk Diagnose v3.5
@@ -12,10 +15,15 @@ echo    [1]  Quick diagnose          (60-90 sec)
 echo    [2]  Volledige diagnose      (3-8 min)
 echo    [3]  Quick zonder speedtest  (30 sec)
 echo    [4]  Full zonder speedtest   (2-5 min)
+echo    [5]  Alleen speedtest        (30-60 sec)
+echo.
+echo    [0]  Afsluiten
 echo.
 
 set "MODUS=1"
-set /p MODUS="  Keuze (1/2/3/4) [1]: "
+set /p MODUS="  Keuze (0/1/2/3/4/5) [1]: "
+
+if "%MODUS%"=="0" goto EXIT
 
 echo.
 set "KLANT="
@@ -39,6 +47,10 @@ if "%MODUS%"=="4" (
     set "PARAMS=-Full -NoSpeedtest"
     echo  Modus: FULL zonder speedtest
 )
+if "%MODUS%"=="5" (
+    set "PARAMS=-SpeedtestOnly"
+    echo  Modus: ALLEEN SPEEDTEST
+)
 
 if not "%KLANT%"=="" (
     set "PARAMS=%PARAMS% -ClientName "%KLANT%""
@@ -54,6 +66,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0netwerk-diagnose-v3_5.
 
 echo.
 echo  ===========================================
-echo  Diagnose voltooid. Druk op een toets.
+echo  Diagnose voltooid.
+echo  Druk op een toets om terug te gaan naar het menu...
 echo  ===========================================
 pause >nul
+goto MENU
+
+:EXIT
+echo.
+echo  Tot ziens!
+echo.
